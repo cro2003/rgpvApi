@@ -2,7 +2,10 @@
 RGPV API wrapper, written in Python.
 
 ## Installation
-
+Install using Pypi:
+```bash
+pip install rgpvApi
+```
 Install from sources:
 ```bash
 git clone https://github.com/cro2003/rgpvApi.git
