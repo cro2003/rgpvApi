@@ -66,7 +66,7 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return {"error":"Enrollment No not Found"}
+            return json.dumps({"error":"Enrollment No not Found"})
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblNameGrading').get_text().split())
         returnInfo['status'] = " ".join(
             self.soup.find(id='ctl00_ContentPlaceHolder1_lblResultNewGrading').get_text().split())
@@ -119,7 +119,7 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return {"error":"Enrollment No not Found"}
+            return json.dumps({"error":"Enrollment No not Found"})
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblName').get_text().split())
         returnInfo['Subjects'] = []
         table = self.soup.find(id='ctl00_ContentPlaceHolder1_gvRevalResult').find_all('tr')
@@ -170,7 +170,7 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return {"error":"Enrollment No not Found"}
+            return json.dumps({"error":"Enrollment No not Found"})
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblName').get_text().split())
         returnInfo['Subjects'] = []
         table = self.soup.find(id='ctl00_ContentPlaceHolder1_gvRevalResult').find_all('tr')
