@@ -1,0 +1,29 @@
+rgpvApi package
+===============
+
+Submodules
+----------
+
+rgpvApi.info\_api module
+------------------------
+
+.. automodule:: rgpvApi.info_api
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+rgpvApi.result\_api module
+--------------------------
+
+.. automodule:: rgpvApi.result_api
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: rgpvApi
+   :members:
+   :undoc-members:
+   :show-inheritance:
