@@ -6,12 +6,6 @@ Install using Pypi:
 ```bash
 pip install rgpvApi
 ```
-Install from sources:
-```bash
-git clone https://github.com/cro2003/rgpvApi.git
-cd rgpvApi
-python3 -m pip install -e .
-```
 
 ## Usage
 Example code to get Main Result:
