@@ -10,15 +10,15 @@ pip install rgpvApi
 ## Usage
 Example code to get Main Result:
 ```python
-from rgpvApi import result
+import rgpvApi
 
 enrollId = ENROLLMENT_NUMBER
 courseId = COURSE_ID
 sem = SEMESTER
 
-Res = result(enrollId, courseId)
+stu_result = rgpvApi.result(enrollId, courseId)
 
-print(Res.getMain(sem))
+print(stu_result.getMain(sem))
 ```
 
 ## Contact 
