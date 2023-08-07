@@ -216,7 +216,7 @@ class result():
         img = ImageOps.invert(img)
         img = img.filter(ImageFilter.SHARPEN)
         text = pytesseract.image_to_string(img)
-        text = str(text).replace(' ', '').replace('\n', '').upper()
+        text = str(text).strip().replace(' ', '').replace('\n', '').upper()
         if len(text)!=5 and self.courseId!=11:
             self.__captchaSolver(link)
         else:
