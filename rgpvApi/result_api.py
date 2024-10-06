@@ -7,6 +7,7 @@ import pytesseract
 import urllib.parse
 from bs4 import BeautifulSoup
 from PIL import Image, ImageFilter, ImageOps
+import pandas as pd
 
 class result():
     """
@@ -223,12 +224,12 @@ class result():
         else:
             return text
 
-def csvresults(input_csv , result_type : str, courseId : int, sem : int):
+def bulkresults(input_path , result_type : str, courseId : int, sem : int):
     """This Function Fetches the selected Examination Result in bulk.
 
 
                 Args:
-                    input_csv (str) : path to the csv file with one column titled "enrolment_id"
+                    input_path (str) : path to the csv file or excel file with one column titled "enrolment_id"
                     result_type (str) : "main" or "revaluation" or "challenge"
                     sem (int): Semester for which Examination Result needed
 
@@ -272,21 +273,29 @@ def csvresults(input_csv , result_type : str, courseId : int, sem : int):
                     }
             """
     results={}
-    with open(input_csv, mode='r') as file:
-        reader =csv.DictReader(file)
-        for row in reader:
-            enrolment_id=row.get('enrolment_id')
-            if enrolment_id:
-                stu_result = result(enrolment_id, courseId)
+    if input_path.endswith("csv"):
+        reader = pd.read_csv(input_path)
+    elif input_path.endswith("xlsx"):
+        reader = pd.read_excel(input_path)
+    else:
+        raise ValueError("Invalid Input file type.")
+    for idx, row in reader.iterrows():
+        enrolment_id=row['enrolment_id']
+        if enrolment_id:
+            stu_result = result(enrolment_id, courseId)
 
-                if result_type == 'main':
-                    fetched_result = stu_result.getMain(sem)
-                elif result_type == 'revaluation':
-                    fetched_result = stu_result.getReval(sem)
-                elif result_type == 'challenge':
-                    fetched_result = stu_result.getChlng(sem)
-                else:
-                    raise ValueError("Invalid result_type. Choose from 'main', 'revaluation', or 'challenge'.")
-                fetched_result = json.loads(fetched_result)
-                results[enrolment_id] = fetched_result
+            if result_type == 'main':
+                fetched_result = stu_result.getMain(sem)
+            elif result_type == 'revaluation':
+                fetched_result = stu_result.getReval(sem)
+            elif result_type == 'challenge':
+                fetched_result = stu_result.getChlng(sem)
+            else:
+                raise ValueError("Invalid result_type. Choose from 'main', 'revaluation', or 'challenge'.")
+            fetched_result = json.loads(fetched_result)
+            results[enrolment_id] = fetched_result
     return json.dumps(results)
+
+print(bulkresults("tse.xlsx","main", 24, 3))
+
+print(bulkresults("ts.csv","main", 24, 3))
