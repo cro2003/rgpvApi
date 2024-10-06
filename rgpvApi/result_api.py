@@ -295,7 +295,3 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
             fetched_result = json.loads(fetched_result)
             results[enrolment_id] = fetched_result
     return json.dumps(results)
-
-print(bulkresults("tse.xlsx","main", 24, 3))
-
-print(bulkresults("ts.csv","main", 24, 3))
