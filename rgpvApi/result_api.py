@@ -272,18 +272,19 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
                           }
                     }
             """
-    results={}
+    results = {}
+
     if input_path.endswith("csv"):
         reader = pd.read_csv(input_path)
     elif input_path.endswith("xlsx"):
         reader = pd.read_excel(input_path)
     else:
         raise ValueError("Invalid Input file type.")
-    for idx, row in reader.iterrows():
-        enrolment_id=row['enrolment_id']
+
+    def fetch_result(row):
+        enrolment_id = row['enrolment_id']
         if enrolment_id:
             stu_result = result(enrolment_id, courseId)
-
             if result_type == 'main':
                 fetched_result = stu_result.getMain(sem)
             elif result_type == 'revaluation':
@@ -292,6 +293,16 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
                 fetched_result = stu_result.getChlng(sem)
             else:
                 raise ValueError("Invalid result_type. Choose from 'main', 'revaluation', or 'challenge'.")
-            fetched_result = json.loads(fetched_result)
-            results[enrolment_id] = fetched_result
+            return enrolment_id, json.loads(fetched_result)
+        return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        future_to_enrolment = {executor.submit(fetch_result, row): row for _, row in reader.iterrows()}
+        
+        for future in concurrent.futures.as_completed(future_to_enrolment):
+            _result = future.result()
+            if _result:
+                enrolment_id, fetched_result = _result
+                results[enrolment_id] = fetched_result
+
     return json.dumps(results)
