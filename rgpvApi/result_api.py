@@ -308,6 +308,3 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
                 results[enrolment_id] = fetched_result
 
     return json.dumps(results)
-
-
-print(bulkresults("ts.csv", "main", 24, 4))
