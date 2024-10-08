@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from PIL import Image, ImageFilter, ImageOps
 import pandas as pd
 from concurrent.futures import *
+from datetime import datetime, timedelta
 
 
 class result():
@@ -225,6 +226,75 @@ class result():
             self.__captchaSolver(link)
         else:
             return text
+
+
+
+def get_notifications(_from=None, _to=None):
+    """
+    Fetch notifications from RGPV based on specified date filters.
+
+    Parameters:
+    _from (str): The start date in 'dd-mm-yyyy' format. Fetch notifications from this date onward.
+    _to (str): The end date in 'dd-mm-yyyy' format. Fetch notifications between this and the _from date.
+
+    Returns:
+    str: JSON formatted string of notifications, with date formatted as 'dd/mm/yy'.
+    If no dates are provided, returns notifications from the last 30 days.
+
+        {
+            'date': '2023-08-05T00:00:00.000',
+            'title': 'Advertisement for Guest Faculty - School of Applied Management '
+                '(MBA)'
+        },
+        {
+            'date': '2023-08-05T00:00:00.000',
+            'title': 'Urgent notice about sports grants 2021-2022'
+        },
+        {
+            'date': '2023-02-05T00:00:00.000',
+            'title': 'Notification regarding Cancellation of Registration and Extension '
+                'Re-Registration'
+        }
+    """
+    # Read data from the specified URL
+    data = pd.read_html("https://www.rgpv.ac.in/Uni/ImpNoticeArchive.aspx")[1][[1, 2]]
+    
+    # Rename columns to "date" and "title"
+    data.columns = ['date', 'title']
+    
+    # Convert the date column to datetime, coercing errors to NaT
+    data['date'] = pd.to_datetime(data['date'], errors='coerce', format='%d/%m/%Y')  # Adjusting for dd/mm/yyyy format
+
+    # Initialize an empty list for parsed dates
+    dates = []
+
+    # Process _from and _to if provided
+    if _from and _to:
+        for date in [_from, _to]:
+            # Convert to datetime, coercing errors to NaT
+            parsed_date = pd.to_datetime(date, errors='coerce', format='%d-%m-%Y')  # Adjust format if needed
+            dates.append(parsed_date)
+
+        # Filter the DataFrame between the specified dates
+        filtered_data = data[(data['date'] >= dates[0]) & (data['date'] <= dates[1])]
+        
+    elif _from:  # If only _from is given
+        parsed_from_date = pd.to_datetime(_from, errors='coerce', format='%d-%m-%Y')
+        filtered_data = data[data['date'] >= parsed_from_date]
+    
+    else:  # If neither _from nor _to is provided, get the last 30 days
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        filtered_data = data[data['date'] >= thirty_days_ago]
+    
+    # Format the date in 'dd/mm/yy' for JSON output using .loc to avoid SettingWithCopyWarning
+    filtered_data.loc[:, 'date'] = filtered_data['date'].dt.strftime('%d/%m/%y')
+
+    # Convert the filtered DataFrame to JSON format
+    result_json = filtered_data.to_json(orient='records', date_format='iso')
+    return result_json
+
+
+
 
 def bulkresults(input_path , result_type : str, courseId : int, sem : int):
     """This Function Fetches the selected Examination Result in bulk.
