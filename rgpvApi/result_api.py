@@ -8,6 +8,8 @@ import urllib.parse
 from bs4 import BeautifulSoup
 from PIL import Image, ImageFilter, ImageOps
 import pandas as pd
+from concurrent.futures import *
+
 
 class result():
     """
@@ -296,13 +298,16 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
             return enrolment_id, json.loads(fetched_result)
         return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         future_to_enrolment = {executor.submit(fetch_result, row): row for _, row in reader.iterrows()}
         
-        for future in concurrent.futures.as_completed(future_to_enrolment):
+        for future in as_completed(future_to_enrolment):
             _result = future.result()
             if _result:
                 enrolment_id, fetched_result = _result
                 results[enrolment_id] = fetched_result
 
     return json.dumps(results)
+
+
+print(bulkresults("ts.csv", "main", 24, 4))
