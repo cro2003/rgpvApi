@@ -12,6 +12,8 @@ from concurrent.futures import *
 from datetime import datetime, timedelta
 
 
+
+
 class result():
     """
         This Class Contains Three Important Functions for fetching different Examination Results.
@@ -340,6 +342,8 @@ def get_notifications(_from=None, _to=None):
         thirty_days_ago = datetime.now() - timedelta(days=30)
         filtered_notifications = [n for n in notifications if n['date'] >= thirty_days_ago]
 
+    
+    a = json.loads(fetch_alerts())
     # Prepare the final output
     output = []
     for notification in filtered_notifications:
@@ -348,9 +352,21 @@ def get_notifications(_from=None, _to=None):
             'alert': notification['title'],
             'link': notification['link']
         })
-    a = json.loads(fetch_alerts())
-    a.extend(output)
-    return json.dumps(a)
+    
+    if _from and _to:
+        _to_date = datetime.strptime(_to, '%d-%m-%Y')
+        if _to_date >= datetime.now() - timedelta(days=30) :
+            a.extend(output)
+            output = a
+    elif _from:
+        a.extend(output)
+        output = a
+    else:
+        a.extend(output)
+        output = a
+    
+    return json.dumps(output)
+
 
 
 
