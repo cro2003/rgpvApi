@@ -350,7 +350,7 @@ def get_notifications(_from=None, _to=None):
         output.append({
             'date': notification['date'].strftime('%d/%m/%y'),  # Format the date
             'alert': notification['title'],
-            'link': notification['link']
+            'link': url
         })
     
     if _from and _to:
