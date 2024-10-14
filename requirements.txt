@@ -3,3 +3,4 @@ requests
 pytesseract
 beautifulsoup4
 Pillow
+aiohttp
