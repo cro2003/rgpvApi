@@ -1,4 +1,7 @@
 import json
+from datetime import datetime, timedelta
+import requests
+from bs4 import BeautifulSoup
 class info():
     """This Class have Information About the Package"""
 
@@ -74,3 +77,139 @@ class info():
         - 'link': The link to the notification.
         """
         pass
+
+def fetch_alerts():
+    """
+    Fetch alerts from the RGPV website.
+
+    This function sends a GET request to the RGPV website, parses the HTML content,
+    and extracts alerts from the alert modal. It retrieves the alert text and link,
+    if available, and structures this data in a JSON format.
+
+    Returns:
+    str: JSON formatted string containing alerts, each with a 'data' key set to 
+    "Not available", 'text' for alert text, and 'link' for the associated link (if any).
+    """
+    url = 'https://www.rgpv.ac.in/'
+    # Send a GET request to fetch the HTML content of the website
+    response = requests.get(url)
+    
+    # Parse the HTML content using BeautifulSoup
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Select the alert modal body content using the modal's ID
+    modal_body = soup.select_one('#alert-modal .modal-body .tab-content')
+
+    # Initialize the response dictionary
+    alerts = []
+
+    # Check if the modal body exists
+    if not modal_body:
+        return json.dumps(alerts)
+
+    # Get all the alert containers (both ImpText1 and ImpText2)
+    alert_items = modal_body.select('.ImpText1, .ImpText2')
+
+    # Loop through each alert item and extract the text and link
+    for alert in alert_items:
+        # Get the alert text
+        alert_text = alert.get_text(strip=True)
+
+        # Get the anchor link inside the alert, if it exists
+        alert_link = alert.find('a')['href'] if alert.find('a') else None
+
+        # Add the alert information to the alerts list
+        alerts.append({
+            "date": "Not available", 
+            'alert': alert_text.replace("Click Here to View",""),
+            'link': "https://www.rgpv.ac.in"+alert_link
+        })
+
+    # Return the response data as JSON format
+    return json.dumps(alerts, indent=4)
+
+
+def get_notifications(_from=None, _to=None):
+    """
+    Fetch notifications from RGPV based on specified date filters.
+
+    Parameters:
+    _from (str): The start date in 'dd-mm-yyyy' format. Fetch notifications from this date onward.
+    _to (str): The end date in 'dd-mm-yyyy' format. Fetch notifications between this and the _from date.
+
+    Returns:
+    str: JSON formatted string of notifications with date formatted as 'dd/mm/yy'.
+    If no dates are provided, returns notifications from the last 30 days.
+    """
+    # Fetch the HTML content from the URL
+    url = "https://www.rgpv.ac.in/Uni/ImpNoticeArchive.aspx"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    # Find the table containing the notifications
+    table = soup.find('table', class_='table table-bordered table-condensed table-striped')
+
+    # Initialize a list to store notifications
+    notifications = []
+
+    # Parse the rows in the table
+    for row in table.find_all('tr')[2:]:  # Skip the header rows
+        cols = row.find_all('td')
+        if len(cols) >= 3:
+            date_str = cols[1].get_text(strip=True)
+            title_tag = cols[2].find('a')  # Get the anchor tag
+
+            # Check if the title tag exists
+            if title_tag:
+                title = title_tag.get_text(strip=True)
+                link = title_tag['href']
+                
+                # Add to notifications list
+                notifications.append({
+                    'date': date_str,
+                    'title': title,
+                    'link': link
+                })
+
+    # Convert date strings to datetime objects for filtering
+    for notification in notifications:
+        notification['date'] = datetime.strptime(notification['date'], '%d/%m/%Y')
+
+    # Apply date filtering
+    if _from and _to:
+        _from_date = datetime.strptime(_from, '%d-%m-%Y')
+        _to_date = datetime.strptime(_to, '%d-%m-%Y')
+        filtered_notifications = [
+            n for n in notifications if _from_date <= n['date'] <= _to_date
+        ]
+    elif _from:  # If only _from is provided
+        _from_date = datetime.strptime(_from, '%d-%m-%Y')
+        filtered_notifications = [n for n in notifications if n['date'] >= _from_date]
+    else:  # If neither _from nor _to is provided, get the last 30 days
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        filtered_notifications = [n for n in notifications if n['date'] >= thirty_days_ago]
+
+    
+    a = json.loads(fetch_alerts())
+    # Prepare the final output
+    output = []
+    for notification in filtered_notifications:
+        output.append({
+            'date': notification['date'].strftime('%d/%m/%y'),  # Format the date
+            'alert': notification['title'],
+            'link': url
+        })
+    
+    if _from and _to:
+        _to_date = datetime.strptime(_to, '%d-%m-%Y')
+        if _to_date >= datetime.now() - timedelta(days=30) :
+            a.extend(output)
+            output = a
+    elif _from:
+        a.extend(output)
+        output = a
+    else:
+        a.extend(output)
+        output = a
+    
+    return json.dumps(output)
