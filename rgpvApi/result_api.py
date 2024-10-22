@@ -1,6 +1,7 @@
 import io
 import time
 import csv
+import sqlite3
 import json
 import requests
 import pytesseract
@@ -18,8 +19,10 @@ class result():
         Args:
             enrollId (string): 12 Character Enrollment Number of Student
             courseId (int): Course Id of the Course in which Student admitted to, which can be fetched by `rgpvApi.info_api.info.courseId()`
+            max_cache_duration (float): Time in seconds to wait before invalidating the cache and refetching the results
+            cache_path (string): The path to the directory where cache db is stored
     """
-    def __init__(self, enrollId: str, courseId: int):
+    def __init__(self, enrollId: str, courseId: int, max_cache_duration=86400.0, cache_path="./"):
         self.enrollId = enrollId
         self.courseId = courseId
         self.cookies = None
@@ -28,6 +31,11 @@ class result():
         if self.courseId not in [1, 24, 5, 2, 43, 11, 7, 6, 8, 10, 20, 21, 23, 3, 44, 51, 22, 53, 4, 42, 71]:
             raise ValueError("Invalid CourseId, Check info.courseId")
         self.ReqSession = requests.Session()
+        self.max_cache_duration=max_cache_duration
+        self.conn = sqlite3.connect(cache_path+"cache.db")
+        self.cursor = self.conn.cursor()
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS records
+             (time TEXT, enrollId TEXT, courseId INTEGER, sem INTEGER, func TEXT, message TEXT)''')
 
     def __checkSem(self):
         semData = {1: 8, 24: 8, 5: 6, 2: 8, 43: 8, 11: 10, 7: 4, 6: 6, 8: 6, 10: 8, 20: 6, 21: 10, 23: 10, 3: 8, 44: 4, 51: 4, 22: 4, 53: 6, 4: 4, 42: 8, 71: 4}
@@ -35,11 +43,12 @@ class result():
             raise ValueError(f"Invalid Semester for {self.courseId}")
         self.__prgSel()
 
-    def getMain(self, sem: int):
+    def getMain(self, sem: int, cache=True):
         """This Function Fetches the Main Semester Examination Result.
 
         :Args:
             sem (int): Semester for which Examination Result needed
+            cache (bool): Should the results be fetched from and inserted to cache or not
 
         :Returns:
             json: Returns the Examination Result in following format
@@ -61,6 +70,18 @@ class result():
         """
         self.sem = sem
         self.__checkSem()
+        if(cache):
+            stmt = 'SELECT message, time FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="main"'
+            self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+            output = self.cursor.fetchall()
+            if(len(output)>=1):
+                if(time.time()-float(output[0][1])<self.max_cache_duration):
+                    self.conn.commit()
+                    return output[0][0]
+                else:
+                    stmt = 'DELETE FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="main"'
+                    self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+                    self.conn.commit()
         headers = {'Host': 'result.rgpv.ac.in', 'Cache-Control': 'max-age=0', 'Origin': 'http://result.rgpv.ac.in', 'DNT': '1', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Referer': 'http://result.rgpv.ac.in/result/ProgramSelect.aspx', 'Accept-Language': 'en-GB,en;q=0.9'}
         data = {'__EVENTARGUMENT': '', '__LASTFOCUS': '', '__VIEWSTATE': self.VIEWSTATE, '__VIEWSTATEGENERATOR': self.VIEWSTATEGENERATOR, '__EVENTVALIDATION': self.EVENTVALIDATION, '__EVENTTARGET': 'radlstProgram$1', 'radlstProgram': str(self.courseId)}
         response = self.ReqSession.post('http://result.rgpv.ac.in/Result/ProgramSelect.aspx', headers=headers, data=data, allow_redirects=False)
@@ -70,7 +91,12 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return json.dumps({"error":"Enrollment No not Found"})
+            func_output = json.dumps({"error":"Enrollment No not Found"})
+            if(cache):
+                stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "main", ?)'
+                self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+                self.conn.commit()
+            return func_output
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblNameGrading').get_text().split())
         returnInfo['status'] = " ".join(
             self.soup.find(id='ctl00_ContentPlaceHolder1_lblResultNewGrading').get_text().split())
@@ -85,14 +111,20 @@ class result():
             subjectInfo['subject'] = " ".join(element[0].get_text().split())
             subjectInfo['grade'] = " ".join(element[3].get_text().split())
             returnInfo['subjects'].append(subjectInfo)
-        return json.dumps(returnInfo)
+        func_output = json.dumps(returnInfo)
+        if(cache):
+            stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "main", ?)'
+            self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+            self.conn.commit()
+        return func_output
 
-    def getReval(self, sem: int):
+    def getReval(self, sem: int, cache=True):
         """This Function Fetches the Revaluation Examination Result.
 
 
             Args:
                 sem (int): Semester for which Examination Result needed
+                cache (bool): Should the results be fetched from and inserted to cache or not
 
             :Returns:
                 json: Returns the Examination Result in following format
@@ -114,6 +146,18 @@ class result():
         """
         self.sem = sem
         self.__checkSem()
+        if(cache):
+            stmt = 'SELECT message, time FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="reval"'
+            self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+            output = self.cursor.fetchall()
+            if(len(output)>=1):
+                if(time.time()-float(output[0][1])<self.max_cache_duration):
+                    self.conn.commit()
+                    return output[0][0]
+                else:
+                    stmt = 'DELETE FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="reval"'
+                    self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+                    self.conn.commit()
         headers = {'Host': 'result.rgpv.ac.in', 'Cache-Control': 'max-age=0', 'Origin': 'http://result.rgpv.ac.in', 'DNT': '1', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Referer': 'http://result.rgpv.ac.in/result/ProgramSelect.aspx', 'Accept-Language': 'en-GB,en;q=0.9'}
         data = {'__EVENTARGUMENT': '', '__LASTFOCUS': '', '__VIEWSTATE': self.VIEWSTATE, '__VIEWSTATEGENERATOR': self.VIEWSTATEGENERATOR, '__EVENTVALIDATION': self.EVENTVALIDATION, '__EVENTTARGET': 'radlstRevalProg$1', 'radlstRevalProg': str(self.courseId)}
         response = self.ReqSession.post('http://result.rgpv.ac.in/Result/ProgramSelect.aspx', headers=headers, data=data, allow_redirects=False)
@@ -123,7 +167,12 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return json.dumps({"error":"Enrollment No not Found"})
+            func_output = json.dumps({"error":"Enrollment No not Found"})
+            if(cache):
+                stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "reval", ?)'
+                self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+                self.conn.commit()
+            return func_output
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblName').get_text().split())
         returnInfo['Subjects'] = []
         table = self.soup.find(id='ctl00_ContentPlaceHolder1_gvRevalResult').find_all('tr')
@@ -136,14 +185,20 @@ class result():
             subjectInfo['status'] = " ".join(element[4].get_text().split())
             subjectInfo['newGrade'] = " ".join(element[3].get_text().split())
             returnInfo['Subjects'].append(subjectInfo)
-        return json.dumps(returnInfo)
+        func_output = json.dumps(returnInfo)
+        if(cache):
+            stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "reval", ?)'
+            self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+            self.conn.commit()
+        return func_output
 
-    def getChlng(self, sem: int):
+    def getChlng(self, sem: int, cache=True):
         """This Function Fetches the Challenge Examination Result.
 
 
             Args:
                 sem (int): Semester for which Examination Result needed
+                cache (bool): Should the results be fetched from and inserted to cache or not
 
             :Returns:
                 json: Returns the Examination Result in following format
@@ -165,6 +220,18 @@ class result():
         """
         self.sem = sem
         self.__checkSem()
+        if(cache):
+            stmt = 'SELECT message, time FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="chlng"'
+            self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+            output = self.cursor.fetchall()
+            if(len(output)>=1):
+                if(time.time()-float(output[0][1])<self.max_cache_duration):
+                    self.conn.commit()
+                    return output[0][0]
+                else:
+                    stmt = 'DELETE FROM records WHERE enrollId=? AND courseId=? AND sem=? AND func="chlng"'
+                    self.cursor.execute(stmt, (self.enrollId, self.courseId, self.sem))
+                    self.conn.commit()
         headers = {'Host': 'result.rgpv.ac.in', 'Cache-Control': 'max-age=0', 'Origin': 'http://result.rgpv.ac.in', 'DNT': '1', 'Upgrade-Insecure-Requests': '1', 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7', 'Referer': 'http://result.rgpv.ac.in/result/ProgramSelect.aspx', 'Accept-Language': 'en-GB,en;q=0.9'}
         data = {'__EVENTARGUMENT': '', '__LASTFOCUS': '', '__VIEWSTATE': self.VIEWSTATE, '__VIEWSTATEGENERATOR': self.VIEWSTATEGENERATOR, '__EVENTVALIDATION': self.EVENTVALIDATION, '__EVENTTARGET': 'ChallengeRbtnList$1', 'ChallengeRbtnList': str(self.courseId)}
         response = self.ReqSession.post('http://result.rgpv.ac.in/Result/ProgramSelect.aspx', headers=headers, data=data, allow_redirects=False)
@@ -174,7 +241,12 @@ class result():
         self.__chkReslt()
         returnInfo = {"enrollId": self.enrollId}
         if self.mainResponse.text.find("Result for this Enrollment No. not Found") != -1 or self.mainResponse.text.find('Enrollment No not Found') != -1:
-            return json.dumps({"error":"Enrollment No not Found"})
+            func_output = json.dumps({"error":"Enrollment No not Found"})
+            if(cache):
+                stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "chlng", ?)'
+                self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+                self.conn.commit()
+            return func_output
         returnInfo['name'] = " ".join(self.soup.find(id='ctl00_ContentPlaceHolder1_lblName').get_text().split())
         returnInfo['Subjects'] = []
         table = self.soup.find(id='ctl00_ContentPlaceHolder1_gvRevalResult').find_all('tr')
@@ -187,7 +259,12 @@ class result():
             subjectInfo['status'] = " ".join(element[4].get_text().split())
             subjectInfo['newGrade'] = " ".join(element[3].get_text().split())
             returnInfo['Subjects'].append(subjectInfo)
-        return json.dumps(returnInfo)
+        func_output = json.dumps(returnInfo)
+        if(cache):
+            stmt = 'INSERT INTO records VALUES(?, ?, ?, ?, "chlng", ?)'
+            self.cursor.execute(stmt, (time.time(), self.enrollId, self.courseId, self.sem, func_output))
+            self.conn.commit()
+        return func_output
 
     def __prgSel(self):
         response = self.ReqSession.get('http://result.rgpv.ac.in/result/programselect.aspx?id=$%')

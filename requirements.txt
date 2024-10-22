@@ -1,4 +1,3 @@
-io
 requests
 pytesseract
 beautifulsoup4
