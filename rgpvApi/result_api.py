@@ -18,7 +18,7 @@ class result():
 
         Args:
             enrollId (string): 12 Character Enrollment Number of Student
-            courseId (int): Course Id of the Course in which Student admitted to, which can be fetched by `rgpvApi.info_api.info.courseId()`
+            courseId (int): Course Id of the Course in which Student admitted to, which can be fetched by rgpvApi.info_api.info.courseId()
             max_cache_duration (float): Time in seconds to wait before invalidating the cache and refetching the results
             cache_path (string): The path to the directory where cache db is stored
     """
