@@ -303,7 +303,7 @@ class result():
         else:
             return text
 
-def bulkresults(input_path , result_type : str, courseId : int, sem : int):
+def bulkresults(input_path , result_type : str, courseId : int, sem : int, cache=True, max_cache_duration=86400.0, cache_path="./"):
     """This Function Fetches the selected Examination Result in bulk.
 
 
@@ -351,6 +351,7 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
                           }
                     }
             """
+    
     results = {}
 
     if input_path.endswith("csv"):
@@ -359,17 +360,17 @@ def bulkresults(input_path , result_type : str, courseId : int, sem : int):
         reader = pd.read_excel(input_path)
     else:
         raise ValueError("Invalid Input file type.")
-
+    
     def fetch_result(row):
         enrolment_id = row['enrolment_id']
         if enrolment_id:
-            stu_result = result(enrolment_id, courseId)
+            stu_result = result(enrolment_id, courseId, max_cache_duration=max_cache_duration, cache_path=cache_path)
             if result_type == 'main':
-                fetched_result = stu_result.getMain(sem)
+                fetched_result = stu_result.getMain(sem, cache=cache)
             elif result_type == 'revaluation':
-                fetched_result = stu_result.getReval(sem)
+                fetched_result = stu_result.getReval(sem, cache=cache)
             elif result_type == 'challenge':
-                fetched_result = stu_result.getChlng(sem)
+                fetched_result = stu_result.getChlng(sem, cache=cache)
             else:
                 raise ValueError("Invalid result_type. Choose from 'main', 'revaluation', or 'challenge'.")
             return enrolment_id, json.loads(fetched_result)
